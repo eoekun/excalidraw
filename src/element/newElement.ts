@@ -29,9 +29,11 @@ import {
   normalizeText,
   wrapText,
   getMaxContainerWidth,
+  getDefaultLineHeight,
 } from "./textElement";
 import { VERTICAL_ALIGN } from "../constants";
 import { isArrowElement } from "./typeChecks";
+import { MarkOptional, Merge, Mutable } from "../utility-types";
 
 type ElementConstructorOpts = MarkOptional<
   Omit<ExcalidrawGenericElement, "id" | "type" | "isDeleted" | "updated">,
@@ -136,11 +138,14 @@ export const newTextElement = (
     textAlign: TextAlign;
     verticalAlign: VerticalAlign;
     containerId?: ExcalidrawTextContainer["id"];
+    lineHeight?: ExcalidrawTextElement["lineHeight"];
   } & ElementConstructorOpts,
 ): NonDeleted<ExcalidrawTextElement> => {
+  const lineHeight = opts.lineHeight || getDefaultLineHeight(opts.fontFamily);
   const text = normalizeText(opts.text);
-  const metrics = measureText(text, getFontString(opts));
+  const metrics = measureText(text, getFontString(opts), lineHeight);
   const offsets = getTextElementPositionOffsets(opts, metrics);
+
   const textElement = newElementWith(
     {
       ..._newElementBase<ExcalidrawTextElement>("text", opts),
@@ -153,8 +158,10 @@ export const newTextElement = (
       y: opts.y - offsets.y,
       width: metrics.width,
       height: metrics.height,
+      baseline: metrics.baseline,
       containerId: opts.containerId || null,
       originalText: text,
+      lineHeight,
     },
     {},
   );
@@ -169,13 +176,15 @@ const getAdjustedDimensions = (
   y: number;
   width: number;
   height: number;
+  baseline: number;
 } => {
   const container = getContainerElement(element);
 
-  const { width: nextWidth, height: nextHeight } = measureText(
-    nextText,
-    getFontString(element),
-  );
+  const {
+    width: nextWidth,
+    height: nextHeight,
+    baseline: nextBaseline,
+  } = measureText(nextText, getFontString(element), element.lineHeight);
   const { textAlign, verticalAlign } = element;
   let x: number;
   let y: number;
@@ -184,7 +193,11 @@ const getAdjustedDimensions = (
     verticalAlign === VERTICAL_ALIGN.MIDDLE &&
     !element.containerId
   ) {
-    const prevMetrics = measureText(element.text, getFontString(element));
+    const prevMetrics = measureText(
+      element.text,
+      getFontString(element),
+      element.lineHeight,
+    );
     const offsets = getTextElementPositionOffsets(element, {
       width: nextWidth - prevMetrics.width,
       height: nextHeight - prevMetrics.height,
@@ -246,6 +259,7 @@ const getAdjustedDimensions = (
   return {
     width: nextWidth,
     height: nextHeight,
+    baseline: nextBaseline,
     x: Number.isFinite(x) ? x : element.x,
     y: Number.isFinite(y) ? y : element.y,
   };
@@ -255,6 +269,9 @@ export const refreshTextDimensions = (
   textElement: ExcalidrawTextElement,
   text = textElement.text,
 ) => {
+  if (textElement.isDeleted) {
+    return;
+  }
   const container = getContainerElement(textElement);
   if (container) {
     text = wrapText(
