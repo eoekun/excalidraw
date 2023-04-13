@@ -36,3 +36,17 @@
   font-display: swap;
   font-weight: 700;
 }
+
+@font-face {
+  font-family: "MeiRenDeZi";
+  src: url("MeiRenDeZi-2.ttf");
+  font-display: swap;
+  font-weight: 700;
+}
+
+@font-face {
+  font-family: "Muyao";
+  src: url("Muyao-Softbrush-2.ttf");
+  font-display: swap;
+  font-weight: 200;
+}
